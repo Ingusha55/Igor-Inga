@@ -1,0 +1,5 @@
+python-telegram-bot==13.7
+flask==2.0.1
+requests==2.26.0
+telethon==1.36.0
+schedule==1.2.2
