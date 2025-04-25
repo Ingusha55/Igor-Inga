@@ -11,6 +11,7 @@ import schedule
 import time
 import flask
 import os
+from telegram.error import RetryAfter  # Добавляем импорт для обработки RetryAfter
 
 # Настройка логирования для отладки
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -214,11 +215,7 @@ def webhook():
 @app_flask.route("/")
 def index():
     logger.info("Запрос на главная страница")
-    updater.bot.delete_webhook()
-    time.sleep(2)  # Задержка для избежания flood control
-    updater.bot.set_webhook(url=WEBHOOK_URL)
-    logger.info(f"Вебхук установлен: {WEBHOOK_URL}")
-    return "Bot is running!"
+    return "Bot is running!"  # Убрали установку вебхука здесь
 
 # Основная функция
 def main():
@@ -240,10 +237,25 @@ def main():
     # Настраиваем вебхук и запускаем Flask
     try:
         logger.info("Запуск бота")
-        updater.bot.delete_webhook()
-        time.sleep(2)  # Задержка
-        updater.bot.set_webhook(url=WEBHOOK_URL)
-        logger.info(f"Вебхук установлен в main: {WEBHOOK_URL}")
+        # Установка вебхука один раз при запуске
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                updater.bot.delete_webhook()
+                time.sleep(2)  # Задержка
+                updater.bot.set_webhook(url=WEBHOOK_URL)
+                logger.info(f"Вебхук установлен в main: {WEBHOOK_URL}")
+                break
+            except RetryAfter as e:
+                logger.warning(f"RetryAfter ошибка: {str(e)}. Ждём {e.retry_after} секунд...")
+                time.sleep(e.retry_after)
+                if attempt == max_retries - 1:
+                    logger.error("Не удалось установить вебхук после нескольких попыток")
+                    return
+            except Exception as e:
+                logger.error(f"Ошибка установки вебхука: {str(e)}")
+                return
+
         app_flask.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
     except Exception as e:
         logger.error(f"Ошибка запуска бота: {str(e)}")
