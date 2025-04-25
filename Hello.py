@@ -32,7 +32,8 @@ if not all([API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY, CHAT_ID]):
 
 # Инициализация Telethon
 client = TelegramClient('session.session', API_ID, API_HASH)
-loop = asyncio.new_event_loop()
+loop_telethon = asyncio.new_event_loop()  # Отдельный цикл для Telethon
+loop_scheduler = asyncio.new_event_loop()  # Отдельный цикл для планировщика
 
 # Flask приложение
 app_flask = flask.Flask(__name__)
@@ -88,6 +89,7 @@ dispatcher.add_handler(CommandHandler("help", send_help))
 def send_weather(update: Update, context) -> None:
     logger.info("Получена команда /weather")
     try:
+        logger.info("Отправка запроса на погоду")
         api_key = WEATHER_API_KEY
         city = "Dnipro"
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric&lang=ru"
@@ -96,7 +98,9 @@ def send_weather(update: Update, context) -> None:
         data = response.json()
         temp = data["main"]["temp"]
         weather = data["weather"][0]["description"]
+        logger.info("Погода получена, отправляем сообщение")
         update.message.reply_text(f"Ингуля, в Днепропетровске {temp}°C, {weather}! ☀️", reply_markup=create_keyboard())
+        logger.info("Сообщение о погоде отправлено")
     except requests.RequestException as e:
         logger.error(f"Ошибка запроса погоды: {str(e)}")
         update.message.reply_text(f"Ой, Ингуля, что-то с погодой не получилось! Давай попробуем позже? 🌦️", reply_markup=create_keyboard())
@@ -140,13 +144,15 @@ async def get_channel_news_async(chat_id):
 
 # Функция для запуска асинхронной задачи в отдельном потоке
 def run_async_in_thread(coro):
-    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    future = asyncio.run_coroutine_threadsafe(coro, loop_telethon)
     return future.result()
 
 # Обертка для вызова асинхронной функции
 def get_channel_news(chat_id):
+    logger.info(f"Запуск загрузки новости для chat_id: {chat_id}")
     try:
         run_async_in_thread(get_channel_news_async(chat_id))
+        logger.info("Новость успешно отправлена")
     except Exception as e:
         logger.error(f"Ошибка в get_channel_news: {str(e)}")
         bot.send_message(chat_id, f"Ой, Ингуля, новости не загрузились. Попробуем ещё раз чуть позже? 🌟")
@@ -154,6 +160,7 @@ def get_channel_news(chat_id):
 # Асинхронное ежедневное сообщение
 async def send_daily_message():
     try:
+        logger.info("Отправка ежедневного сообщения")
         await bot.send_message(chat_id=CHAT_ID, text="Ингуля, доброе утро! Ты мой свет, сияй ярче солнца! 🌞💖")
         logger.info("Ежедневное сообщение отправлено")
     except Exception as e:
@@ -162,7 +169,7 @@ async def send_daily_message():
 # Планировщик для ежедневного сообщения
 def schedule_with_timezone():
     eest = pytz.timezone('Europe/Kiev')
-    schedule.every().day.at("08:00", tz=eest).do(lambda: asyncio.run_coroutine_threadsafe(send_daily_message(), loop))
+    schedule.every().day.at("08:00", tz=eest).do(lambda: asyncio.run_coroutine_threadsafe(send_daily_message(), loop_scheduler))
     logger.info("Планировщик настроен на 08:00 EEST")
 
 # Функция для запуска планировщика
@@ -174,9 +181,14 @@ def run_scheduler():
         time.sleep(60)
 
 # Функция для запуска событийного цикла Telethon
-def run_loop():
-    asyncio.set_event_loop(loop)
-    loop.run_forever()
+def run_loop_telethon():
+    asyncio.set_event_loop(loop_telethon)
+    loop_telethon.run_forever()
+
+# Функция для запуска событийного цикла планировщика
+def run_loop_scheduler():
+    asyncio.set_event_loop(loop_scheduler)
+    loop_scheduler.run_forever()
 
 # Асинхронный запуск Telethon
 async def start_telethon():
@@ -198,6 +210,7 @@ def handle_text(update: Update, context) -> None:
     elif text == "погода ☀️":
         send_weather(update, context)
     elif text == "новости 📰":
+        logger.info("Обработка команды 'Новости 📰'")
         get_channel_news(chat_id)
         update.message.reply_text("Новость отправлена, Ингуля! 📰", reply_markup=create_keyboard())
     elif text == "идеи для праздника 🎈":
@@ -235,9 +248,13 @@ def init():
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
 
-    # Запускаем событийный цикл Telethon
-    thread = threading.Thread(target=run_loop, daemon=True)
-    thread.start()
+    # Запускаем цикл для планировщика
+    scheduler_loop_thread = threading.Thread(target=run_loop_scheduler, daemon=True)
+    scheduler_loop_thread.start()
+
+    # Запускаем цикл для Telethon
+    telethon_loop_thread = threading.Thread(target=run_loop_telethon, daemon=True)
+    telethon_loop_thread.start()
 
     # Запускаем Telethon
     try:
