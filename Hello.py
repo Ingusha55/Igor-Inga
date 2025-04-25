@@ -26,7 +26,7 @@ loop = asyncio.new_event_loop()
 
 # Flask приложение
 app = flask.Flask(__name__)
-WEBHOOK_URL = f"https://my-ingulya-bot.onrender.com/{config.BOT_TOKEN}"
+WEBHOOK_URL = f"https://igor-inga.onrender.com/{config.BOT_TOKEN}"
 
 # Список идей
 ideas = [
