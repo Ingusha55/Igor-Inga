@@ -55,10 +55,13 @@ ideas = [
     "Фонарики в саду! 🏮"
 ]
 
-# Твои каналы (уменьшили до 5)
+# Полный список каналов (17)
 channels = [
-    '@konkretnost', '@SergeyNikolaevichBogatyrev', '@moyshasheckel',
-    '@diana_spletni_live', '@SwissVatnik'
+    '@konkretnost', '@SergeyNikolaevichBogatyrev', '@moyshasheckel', '@sharanism',
+    '@diana_spletni_live', '@SwissVatnik', '@pashatoday_new', '@kotreal',
+    '@NSDVDnepre', '@DneprNR', '@rasstrelny', '@dimonundmir',
+    '@Pavlova_Maria_live', '@readovkanews', '@KremlinPeresmeshnik',
+    '@ostashkonews', '@ukr_2025_ru'
 ]
 
 # Клавиатура
@@ -105,11 +108,18 @@ dispatcher.add_handler(CommandHandler("weather", send_weather))
 # Асинхронная функция для отправки новостей
 async def get_channel_news_async(chat_id):
     try:
+        # Выбираем 5 случайных каналов
+        selected_channels = random.sample(channels, 5)
+        logger.info(f"Выбраны каналы: {selected_channels}")
+        
+        start_time = time.time()
         async with client:
-            for channel in channels:
+            for channel in selected_channels:
                 try:
+                    logger.info(f"Начало загрузки новостей из {channel}")
+                    channel_start_time = time.time()
                     entity = await client.get_entity(channel)
-                    messages = await client.get_messages(entity, limit=1)  # Уменьшили с 2 до 1
+                    messages = await client.get_messages(entity, limit=3)  # 3 последних сообщения
                     await bot.send_message(chat_id=chat_id, text=f"📢 Новости из {channel}:")
                     for msg in messages:
                         if msg.message:
@@ -120,12 +130,14 @@ async def get_channel_news_async(chat_id):
                                 "━━━━━━━━━━━━━━━━━━━━━━"
                             )
                             await bot.send_message(chat_id=chat_id, text=formatted_message)
-                            await asyncio.sleep(1)  # Задержка 1 секунда между сообщениями
+                            await asyncio.sleep(0.5)  # Задержка 0.5 секунды между сообщениями
                     await bot.send_message(chat_id=chat_id, text=" ")
-                    await asyncio.sleep(1)  # Задержка между каналами
+                    await asyncio.sleep(0.5)  # Задержка между каналами
+                    logger.info(f"Новости из {channel} загружены за {time.time() - channel_start_time:.2f} сек")
                 except Exception as e:
                     logger.error(f"Ошибка с каналом {channel}: {str(e)}")
                     await bot.send_message(chat_id=chat_id, text=f"Ой, Ингуля, новости из {channel} не загрузились. Попробуем позже? 🌟")
+        logger.info(f"Все новости загружены за {time.time() - start_time:.2f} сек")
     except Exception as e:
         logger.error(f"Ошибка подключения к Telegram: {str(e)}")
         await bot.send_message(chat_id=chat_id, text=f"Ингуля, что-то пошло не так с подключением к Telegram. Давай попробуем ещё раз? 🌈")
