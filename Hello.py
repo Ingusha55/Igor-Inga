@@ -1,3 +1,8 @@
+import sys
+import site
+print("Python version:", sys.version)
+print("sys.path:", sys.path)
+print("site.getsitepackages():", site.getsitepackages())
 import telebot
 import random
 import requests
