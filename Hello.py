@@ -3,6 +3,7 @@ import requests
 from telegram import Bot, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram import ReplyKeyboardMarkup, KeyboardButton
+from telethon.sync import TelegramClient
 import asyncio
 import logging
 import threading
@@ -11,20 +12,27 @@ import time
 import flask
 import os
 from telegram.error import RetryAfter
+import pytz
 
 # Настройка логирования для отладки
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Считываем переменные окружения
+API_ID = int(os.getenv('API_ID'))
+API_HASH = os.getenv('API_HASH')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
 CHAT_ID = os.getenv('CHAT_ID')
 
 # Проверяем, что все переменные окружения заданы
-if not all([BOT_TOKEN, WEATHER_API_KEY, CHAT_ID]):
+if not all([API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY, CHAT_ID]):
     logger.error("Одна или несколько переменных окружения отсутствуют!")
-    raise ValueError("Необходимо задать BOT_TOKEN, WEATHER_API_KEY и CHAT_ID в переменных окружения")
+    raise ValueError("Необходимо задать API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY и CHAT_ID в переменных окружения")
+
+# Инициализация Telethon
+client = TelegramClient('session.session', API_ID, API_HASH)
+loop = asyncio.new_event_loop()
 
 # Flask приложение
 app_flask = flask.Flask(__name__)
@@ -47,11 +55,20 @@ ideas = [
     "Фонарики в саду! 🏮"
 ]
 
+# Список каналов
+channels = [
+    '@konkretnost', '@SergeyNikolaevichBogatyrev', '@moyshasheckel', '@sharanism',
+    '@diana_spletni_live', '@SwissVatnik', '@pashatoday_new', '@kotreal',
+    '@NSDVDnepre', '@DneprNR', '@rasstrelny', '@dimonundmir',
+    '@Pavlova_Maria_live', '@readovkanews', '@KremlinPeresmeshnik',
+    '@ostashkonews', '@ukr_2025_ru'
+]
+
 # Клавиатура
 def create_keyboard():
     keyboard = [
         [KeyboardButton("Привет 👋"), KeyboardButton("Погода ☀️")],
-        [KeyboardButton("Идеи для праздника 🎈")]
+        [KeyboardButton("Новости 📰"), KeyboardButton("Идеи для праздника 🎈")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -88,7 +105,53 @@ def send_weather(update: Update, context) -> None:
         update.message.reply_text(f"Ингуля, данные о погоде где-то потерялись! Проверь, пожалуйста, API ключ! 🌦️", reply_markup=create_keyboard())
 dispatcher.add_handler(CommandHandler("weather", send_weather))
 
-# Ежедневное сообщение
+# Асинхронная функция для отправки одной новости из случайного канала
+async def get_channel_news_async(chat_id):
+    try:
+        # Выбираем один случайный канал
+        selected_channel = random.choice(channels)
+        logger.info(f"Выбран канал: {selected_channel}")
+        
+        start_time = time.time()
+        async with client:
+            try:
+                logger.info(f"Начало загрузки новости из {selected_channel}")
+                channel_start_time = time.time()
+                entity = await client.get_entity(selected_channel)
+                messages = await client.get_messages(entity, limit=1)  # Одна последняя новость
+                await bot.send_message(chat_id=chat_id, text=f"📢 Последняя новость из {selected_channel}:")
+                for msg in messages:
+                    if msg.message:
+                        formatted_message = (
+                            "━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"🕒 {msg.date.strftime('%d.%m.%Y %H:%M')}\n\n"
+                            f"{msg.message}\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━"
+                        )
+                        await bot.send_message(chat_id=chat_id, text=formatted_message)
+                logger.info(f"Новость из {selected_channel} загружена за {time.time() - channel_start_time:.2f} сек")
+            except Exception as e:
+                logger.error(f"Ошибка с каналом {selected_channel}: {str(e)}")
+                await bot.send_message(chat_id=chat_id, text=f"Ой, Ингуля, новость из {selected_channel} не загрузилась. Попробуем позже? 🌟")
+        logger.info(f"Новость загружена за {time.time() - start_time:.2f} сек")
+    except Exception as e:
+        logger.error(f"Ошибка подключения к Telegram: {str(e)}")
+        await bot.send_message(chat_id=chat_id, text=f"Ингуля, что-то пошло не так с подключением к Telegram. Давай попробуем ещё раз? 🌈")
+
+# Функция для запуска асинхронной задачи в отдельном потоке
+def run_async_in_thread(coro):
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    return future.result()
+
+# Обертка для вызова асинхронной функции
+def get_channel_news(chat_id):
+    try:
+        run_async_in_thread(get_channel_news_async(chat_id))
+    except Exception as e:
+        logger.error(f"Ошибка в get_channel_news: {str(e)}")
+        bot.send_message(chat_id, f"Ой, Ингуля, новости не загрузились. Попробуем ещё раз чуть позже? 🌟")
+
+# Асинхронное ежедневное сообщение
 async def send_daily_message():
     try:
         await bot.send_message(chat_id=CHAT_ID, text="Ингуля, доброе утро! Ты мой свет, сияй ярче солнца! 🌞💖")
@@ -97,19 +160,33 @@ async def send_daily_message():
         logger.error(f"Ошибка отправки ежедневного сообщения: {str(e)}")
 
 # Планировщик для ежедневного сообщения
-loop = asyncio.new_event_loop()
-schedule.every().day.at("21:07").do(lambda: asyncio.run_coroutine_threadsafe(send_daily_message(), loop))
+def schedule_with_timezone():
+    eest = pytz.timezone('Europe/Kiev')
+    schedule.every().day.at("08:00", tz=eest).do(lambda: asyncio.run_coroutine_threadsafe(send_daily_message(), loop))
+    logger.info("Планировщик настроен на 08:00 EEST")
 
 # Функция для запуска планировщика
 def run_scheduler():
+    schedule_with_timezone()
     while True:
         schedule.run_pending()
+        logger.debug("Планировщик проверяет задачи")
         time.sleep(60)
 
-# Функция для запуска событийного цикла в отдельном потоке
+# Функция для запуска событийного цикла Telethon
 def run_loop():
     asyncio.set_event_loop(loop)
     loop.run_forever()
+
+# Асинхронный запуск Telethon
+async def start_telethon():
+    try:
+        logger.info("Запуск клиента Telethon")
+        await client.connect()
+        logger.info("Клиент Telethon запущен")
+    except Exception as e:
+        logger.error(f"Ошибка запуска Telethon: {str(e)}")
+        raise
 
 # Обработка текста
 def handle_text(update: Update, context) -> None:
@@ -120,6 +197,9 @@ def handle_text(update: Update, context) -> None:
         update.message.reply_text("Привет-привет, моя звезда! 😊", reply_markup=create_keyboard())
     elif text == "погода ☀️":
         send_weather(update, context)
+    elif text == "новости 📰":
+        get_channel_news(chat_id)
+        update.message.reply_text("Новость отправлена, Ингуля! 📰", reply_markup=create_keyboard())
     elif text == "идеи для праздника 🎈":
         update.message.reply_text(f"Вот идея, Ингуля: {random.choice(ideas)} 🎉", reply_markup=create_keyboard())
     elif text == "ингуля":
@@ -155,9 +235,16 @@ def init():
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
 
-    # Запускаем событийный цикл в отдельном потоке
+    # Запускаем событийный цикл Telethon
     thread = threading.Thread(target=run_loop, daemon=True)
     thread.start()
+
+    # Запускаем Telethon
+    try:
+        run_async_in_thread(start_telethon())
+    except Exception as e:
+        logger.error(f"Ошибка инициализации Telethon: {str(e)}")
+        raise
 
     # Настраиваем вебхук
     max_retries = 3
