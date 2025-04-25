@@ -112,7 +112,7 @@ async def get_channel_news_async(chat_id):
             for channel in channels:
                 try:
                     entity = await client.get_entity(channel)
-                    messages = await client.get_messages(entity, limit=5)
+                    messages = await client.get_messages(entity, limit=2)  # Уменьшили с 5 до 2
                     await bot.send_message(chat_id=chat_id, text=f"📢 Новости из {channel}:")
                     for msg in messages:
                         if msg.message:
