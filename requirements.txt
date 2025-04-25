@@ -3,4 +3,4 @@ flask==3.0.3
 requests==2.32.3
 telethon==1.36.0
 schedule==1.2.2
-werkzeug==2.0.3
+werkzeug==3.0.3
