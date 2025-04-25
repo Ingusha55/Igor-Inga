@@ -98,7 +98,7 @@ async def send_daily_message():
 
 # Планировщик для ежедневного сообщения
 loop = asyncio.new_event_loop()
-schedule.every().day.at("08:00").do(lambda: asyncio.run_coroutine_threadsafe(send_daily_message(), loop))
+schedule.every().day.at("23:50").do(lambda: asyncio.run_coroutine_threadsafe(send_daily_message(), loop))
 
 # Функция для запуска планировщика
 def run_scheduler():
