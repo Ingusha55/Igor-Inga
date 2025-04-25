@@ -3,6 +3,12 @@ import site
 print("Python version:", sys.version)
 print("sys.path:", sys.path)
 print("site.getsitepackages():", site.getsitepackages())
+import os
+telebot_path = os.path.join('/opt/render/project/src/.venv/lib/python3.11/site-packages', 'telegram')
+print("Does telegram package exist?:", os.path.exists(telebot_path))
+print("Contents of site-packages:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages'))
+
+
 import telebot
 import random
 import requests
