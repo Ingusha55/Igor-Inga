@@ -29,7 +29,7 @@ if not all([API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY, CHAT_ID]):
     raise ValueError("Необходимо задать API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY и CHAT_ID в переменных окружения")
 
 # Инициализация Telethon
-client = TelegramClient('/etc/secrets/session.session', API_ID, API_HASH)
+client = TelegramClient('session.session', API_ID, API_HASH)  # Изменили путь на session.session
 # Глобальный событийный цикл для telethon
 loop = asyncio.new_event_loop()
 
@@ -44,7 +44,7 @@ dispatcher = updater.dispatcher
 
 # Список идей
 ideas = [
-    "Шарики и конфетти везде! 🎈",
+    "Ш Wарики и конфетти везде! 🎈",
     "Гирлянды мигают, как твоя улыбка! ✨",
     "Танцы под любимую музыку! 🕺",
     "Уютный вечер с чаем и печеньками ☕",
