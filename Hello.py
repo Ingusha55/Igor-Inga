@@ -55,13 +55,10 @@ ideas = [
     "Фонарики в саду! 🏮"
 ]
 
-# Твои каналы
+# Твои каналы (уменьшили до 5)
 channels = [
-    '@konkretnost', '@SergeyNikolaevichBogatyrev', '@moyshasheckel', '@sharanism',
-    '@diana_spletni_live', '@SwissVatnik', '@pashatoday_new', '@kotreal',
-    '@NSDVDnepre', '@DneprNR', '@rasstrelny', '@dimonundmir',
-    '@Pavlova_Maria_live', '@readovkanews', '@KremlinPeresmeshnik',
-    '@ostashkonews', '@ukr_2025_ru'
+    '@konkretnost', '@SergeyNikolaevichBogatyrev', '@moyshasheckel',
+    '@diana_spletni_live', '@SwissVatnik'
 ]
 
 # Клавиатура
@@ -112,7 +109,7 @@ async def get_channel_news_async(chat_id):
             for channel in channels:
                 try:
                     entity = await client.get_entity(channel)
-                    messages = await client.get_messages(entity, limit=2)  # Уменьшили с 5 до 2
+                    messages = await client.get_messages(entity, limit=1)  # Уменьшили с 2 до 1
                     await bot.send_message(chat_id=chat_id, text=f"📢 Новости из {channel}:")
                     for msg in messages:
                         if msg.message:
@@ -123,7 +120,9 @@ async def get_channel_news_async(chat_id):
                                 "━━━━━━━━━━━━━━━━━━━━━━"
                             )
                             await bot.send_message(chat_id=chat_id, text=formatted_message)
+                            await asyncio.sleep(1)  # Задержка 1 секунда между сообщениями
                     await bot.send_message(chat_id=chat_id, text=" ")
+                    await asyncio.sleep(1)  # Задержка между каналами
                 except Exception as e:
                     logger.error(f"Ошибка с каналом {channel}: {str(e)}")
                     await bot.send_message(chat_id=chat_id, text=f"Ой, Ингуля, новости из {channel} не загрузились. Попробуем позже? 🌟")
