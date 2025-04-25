@@ -11,7 +11,7 @@ import schedule
 import time
 import flask
 import os
-from telegram.error import RetryAfter  # Добавляем импорт для обработки RetryAfter
+from telegram.error import RetryAfter
 
 # Настройка логирования для отладки
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -192,7 +192,7 @@ def run_loop():
 async def start_telethon():
     try:
         logger.info("Запуск клиента Telethon")
-        await client.connect()  # Просто подключаемся, без интерактивного start()
+        await client.connect()
         logger.info("Клиент Telethon запущен")
     except Exception as e:
         logger.error(f"Ошибка запуска Telethon: {str(e)}")
@@ -215,10 +215,10 @@ def webhook():
 @app_flask.route("/")
 def index():
     logger.info("Запрос на главная страница")
-    return "Bot is running!"  # Убрали установку вебхука здесь
+    return "Bot is running!"
 
-# Основная функция
-def main():
+# Инициализация при запуске
+def init():
     # Запускаем планировщик
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
@@ -232,38 +232,29 @@ def main():
         run_async_in_thread(start_telethon())
     except Exception as e:
         logger.error(f"Ошибка инициализации Telethon: {str(e)}")
-        return
+        raise
 
-    # Настраиваем вебхук и запускаем Flask
-    try:
-        logger.info("Запуск бота")
-        # Установка вебхука один раз при запуске
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                updater.bot.delete_webhook()
-                time.sleep(2)  # Задержка
-                updater.bot.set_webhook(url=WEBHOOK_URL)
-                logger.info(f"Вебхук установлен в main: {WEBHOOK_URL}")
-                break
-            except RetryAfter as e:
-                logger.warning(f"RetryAfter ошибка: {str(e)}. Ждём {e.retry_after} секунд...")
-                time.sleep(e.retry_after)
-                if attempt == max_retries - 1:
-                    logger.error("Не удалось установить вебхук после нескольких попыток")
-                    return
-            except Exception as e:
-                logger.error(f"Ошибка установки вебхука: {str(e)}")
-                return
+    # Настраиваем вебхук
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            updater.bot.delete_webhook()
+            time.sleep(2)
+            updater.bot.set_webhook(url=WEBHOOK_URL)
+            logger.info(f"Вебхук установлен: {WEBHOOK_URL}")
+            break
+        except RetryAfter as e:
+            logger.warning(f"RetryAfter ошибка: {str(e)}. Ждём {e.retry_after} секунд...")
+            time.sleep(e.retry_after)
+            if attempt == max_retries - 1:
+                logger.error("Не удалось установить вебхук после нескольких попыток")
+                raise
+        except Exception as e:
+            logger.error(f"Ошибка установки вебхука: {str(e)}")
+            raise
 
-        app_flask.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
-    except Exception as e:
-        logger.error(f"Ошибка запуска бота: {str(e)}")
-    finally:
-        loop.call_soon_threadsafe(loop.stop)
-        loop.run_until_complete(loop.shutdown_asyncgens())
-        loop.close()
+# Вызываем инициализацию при запуске
+init()
 
 if __name__ == "__main__":
     print("Бот запущен, Ингуля! Готов к празднику! 🎉")
-    main()
