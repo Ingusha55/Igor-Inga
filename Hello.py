@@ -4,7 +4,6 @@ from telegram import Bot, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 from telethon.sync import TelegramClient
-import config
 import asyncio
 import logging
 import threading
@@ -17,6 +16,18 @@ import os
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Считываем переменные окружения
+API_ID = int(os.getenv('API_ID'))
+API_HASH = os.getenv('API_HASH')
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
+CHAT_ID = os.getenv('CHAT_ID')
+
+# Проверяем, что все переменные окружения заданы
+if not all([API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY, CHAT_ID]):
+    logger.error("Одна или несколько переменных окружения отсутствуют!")
+    raise ValueError("Необходимо задать API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY и CHAT_ID в переменных окружения")
+
 # Инициализация Telethon
 client = TelegramClient('/etc/secrets/session.session', API_ID, API_HASH)
 # Глобальный событийный цикл для telethon
@@ -24,10 +35,10 @@ loop = asyncio.new_event_loop()
 
 # Flask приложение
 app_flask = flask.Flask(__name__)
-WEBHOOK_URL = f"https://igor-inga.onrender.com/{config.BOT_TOKEN}"
+WEBHOOK_URL = f"https://igor-inga.onrender.com/{BOT_TOKEN}"
 
 # Инициализация бота
-updater = Updater(token=config.BOT_TOKEN, use_context=True)
+updater = Updater(token=BOT_TOKEN, use_context=True)
 bot = updater.bot
 dispatcher = updater.dispatcher
 
@@ -76,7 +87,7 @@ dispatcher.add_handler(CommandHandler("help", send_help))
 def send_weather(update: Update, context) -> None:
     logger.info("Получена команда /weather")
     try:
-        api_key = config.WEATHER_API_KEY
+        api_key = WEATHER_API_KEY
         city = "Dnipro"
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric&lang=ru"
         response = requests.get(url, timeout=10)
@@ -153,7 +164,7 @@ def get_channel_news(chat_id):
 # Ежедневное сообщение
 async def send_daily_message():
     try:
-        await bot.send_message(chat_id=config.CHAT_ID, text="Ингуля, доброе утро! Ты мой свет, сияй ярче солнца! 🌞💖")
+        await bot.send_message(chat_id=CHAT_ID, text="Ингуля, доброе утро! Ты мой свет, сияй ярче солнца! 🌞💖")
         logger.info("Ежедневное сообщение отправлено")
     except Exception as e:
         logger.error(f"Ошибка отправки ежедневного сообщения: {str(e)}")
@@ -205,7 +216,7 @@ async def start_telethon():
         raise
 
 # Webhook маршруты
-@app_flask.route(f"/{config.BOT_TOKEN}", methods=["POST"])
+@app_flask.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     logger.info("Получен запрос на вебхук")
     data = flask.request.get_json()
@@ -251,7 +262,7 @@ def main():
         time.sleep(2)  # Задержка
         updater.bot.set_webhook(url=WEBHOOK_URL)
         logger.info(f"Вебхук установлен в main: {WEBHOOK_URL}")
-        app_flask.run(host="0.0.0.0", port=5000)
+        app_flask.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
     except Exception as e:
         logger.error(f"Ошибка запуска бота: {str(e)}")
     finally:
