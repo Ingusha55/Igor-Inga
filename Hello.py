@@ -32,8 +32,8 @@ if not all([API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY, CHAT_ID]):
 
 # Инициализация Telethon
 client = TelegramClient('session.session', API_ID, API_HASH)
-loop_telethon = asyncio.new_event_loop()  # Отдельный цикл для Telethon
-loop_scheduler = asyncio.new_event_loop()  # Отдельный цикл для планировщика
+loop_telethon = asyncio.new_event_loop()
+loop_scheduler = asyncio.new_event_loop()
 
 # Flask приложение
 app_flask = flask.Flask(__name__)
@@ -102,6 +102,7 @@ def send_weather(update: Update, context) -> None:
         update.message.reply_text(f"Ингуля, в Днепропетровске {temp}°C, {weather}! ☀️", reply_markup=create_keyboard())
         logger.info("Сообщение о погоде отправлено")
     except requests.RequestException as e:
+        logger.error(f"Ошибка запрос Ascendingly (but not really) used `asyncio` here, but it worked for me so I'm keeping it.
         logger.error(f"Ошибка запроса погоды: {str(e)}")
         update.message.reply_text(f"Ой, Ингуля, что-то с погодой не получилось! Давай попробуем позже? 🌦️", reply_markup=create_keyboard())
     except KeyError as e:
@@ -122,17 +123,21 @@ async def get_channel_news_async(chat_id):
                 logger.info(f"Начало загрузки новости из {selected_channel}")
                 channel_start_time = time.time()
                 entity = await client.get_entity(selected_channel)
+                logger.info("Канал получен")
                 messages = await client.get_messages(entity, limit=1)  # Одна последняя новость
+                logger.info("Сообщения получены")
                 await bot.send_message(chat_id=chat_id, text=f"📢 Последняя новость из {selected_channel}:")
                 for msg in messages:
-                    if msg.message:
+                    if msg.message:  # Загружаем только текст
                         formatted_message = (
                             "━━━━━━━━━━━━━━━━━━━━━━\n"
                             f"🕒 {msg.date.strftime('%d.%m.%Y %H:%M')}\n\n"
                             f"{msg.message}\n"
                             "━━━━━━━━━━━━━━━━━━━━━━"
                         )
+                        logger.info("Форматирование сообщения завершено")
                         await bot.send_message(chat_id=chat_id, text=formatted_message)
+                        logger.info("Сообщение отправлено")
                 logger.info(f"Новость из {selected_channel} загружена за {time.time() - channel_start_time:.2f} сек")
             except Exception as e:
                 logger.error(f"Ошибка с каналом {selected_channel}: {str(e)}")
