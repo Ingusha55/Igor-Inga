@@ -18,8 +18,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Инициализация Telethon
-client = TelegramClient('session', config.API_ID, config.API_HASH)
-
+client = TelegramClient('/etc/secrets/session.session', API_ID, API_HASH)
 # Глобальный событийный цикл для telethon
 loop = asyncio.new_event_loop()
 
