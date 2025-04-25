@@ -94,6 +94,24 @@ def send_weather(update: Update, context) -> None:
         update.message.reply_text(f"Ингуля, данные о погоде где-то потерялись! Проверь, пожалуйста, API ключ! 🌦️", reply_markup=create_keyboard())
 dispatcher.add_handler(CommandHandler("weather", send_weather))
 
+# Команда /auth для создания сессии
+async def auth_telethon(chat_id):
+    try:
+        async with client:
+            await client.start()
+            logger.info("Сессия создана! Файл session.session готов.")
+            await bot.send_message(chat_id=chat_id, text="Сессия создана! Файл session.session готов. Скачай его через Render Shell.")
+    except Exception as e:
+        logger.error(f"Ошибка создания сессии: {str(e)}")
+        await bot.send_message(chat_id=chat_id, text=f"Ошибка создания сессии: {str(e)}")
+
+def auth(update: Update, context) -> None:
+    chat_id = update.message.chat_id
+    logger.info("Получена команда /auth")
+    asyncio.run_coroutine_threadsafe(auth_telethon(chat_id), loop)
+    update.message.reply_text("Запускаю авторизацию для Telethon... Проверь Telegram для кода!")
+dispatcher.add_handler(CommandHandler("auth", auth))
+
 # Асинхронная функция для отправки новостей
 async def get_channel_news_async(chat_id):
     try:
@@ -102,7 +120,7 @@ async def get_channel_news_async(chat_id):
                 try:
                     entity = await client.get_entity(channel)
                     messages = await client.get_messages(entity, limit=5)
-                    await bot.send_message(chat_id, f"📢 Новости из {channel}:")
+                    await bot.send_message(chat_id=chat_id, text=f"📢 Новости из {channel}:")
                     for msg in messages:
                         if msg.message:
                             formatted_message = (
@@ -111,14 +129,14 @@ async def get_channel_news_async(chat_id):
                                 f"{msg.message}\n"
                                 "━━━━━━━━━━━━━━━━━━━━━━"
                             )
-                            await bot.send_message(chat_id, formatted_message)
-                    await bot.send_message(chat_id, " ")
+                            await bot.send_message(chat_id=chat_id, text=formatted_message)
+                    await bot.send_message(chat_id=chat_id, text=" ")
                 except Exception as e:
                     logger.error(f"Ошибка с каналом {channel}: {str(e)}")
-                    await bot.send_message(chat_id, f"Ой, Ингуля, новости из {channel} не загрузились. Попробуем позже? 🌟")
+                    await bot.send_message(chat_id=chat_id, text=f"Ой, Ингуля, новости из {channel} не загрузились. Попробуем позже? 🌟")
     except Exception as e:
         logger.error(f"Ошибка подключения к Telegram: {str(e)}")
-        await bot.send_message(chat_id, f"Ингуля, что-то пошло не так с подключением к Telegram. Давай попробуем ещё раз? 🌈")
+        await bot.send_message(chat_id=chat_id, text=f"Ингуля, что-то пошло не так с подключением к Telegram. Давай попробуем ещё раз? 🌈")
 
 # Функция для запуска асинхронной задачи в отдельном потоке
 def run_async_in_thread(coro):
@@ -136,7 +154,7 @@ def get_channel_news(chat_id):
 # Ежедневное сообщение
 async def send_daily_message():
     try:
-        await bot.send_message(config.CHAT_ID, "Ингуля, доброе утро! Ты мой свет, сияй ярче солнца! 🌞💖")
+        await bot.send_message(chat_id=config.CHAT_ID, text="Ингуля, доброе утро! Ты мой свет, сияй ярче солнца! 🌞💖")
         logger.info("Ежедневное сообщение отправлено")
     except Exception as e:
         logger.error(f"Ошибка отправки ежедневного сообщения: {str(e)}")
@@ -181,7 +199,7 @@ def run_loop():
 async def start_telethon():
     try:
         logger.info("Запуск клиента Telethon")
-        await client.start(bot_token=config.BOT_TOKEN)
+        await client.start()
         logger.info("Клиент Telethon запущен")
     except Exception as e:
         logger.error(f"Ошибка запуска Telethon: {str(e)}")
@@ -203,8 +221,9 @@ def webhook():
 
 @app_flask.route("/")
 def index():
-    logger.info("Запрос на главную страницу")
+    logger.info("Запрос на главная страница")
     updater.bot.delete_webhook()
+    time.sleep(2)  # Задержка для избежания flood control
     updater.bot.set_webhook(url=WEBHOOK_URL)
     logger.info(f"Вебхук установлен: {WEBHOOK_URL}")
     return "Bot is running!"
@@ -230,6 +249,7 @@ def main():
     try:
         logger.info("Запуск бота")
         updater.bot.delete_webhook()
+        time.sleep(2)  # Задержка
         updater.bot.set_webhook(url=WEBHOOK_URL)
         logger.info(f"Вебхук установлен в main: {WEBHOOK_URL}")
         app_flask.run(host="0.0.0.0", port=5000)
