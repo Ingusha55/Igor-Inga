@@ -102,7 +102,6 @@ def send_weather(update: Update, context) -> None:
         update.message.reply_text(f"Ингуля, в Днепропетровске {temp}°C, {weather}! ☀️", reply_markup=create_keyboard())
         logger.info("Сообщение о погоде отправлено")
     except requests.RequestException as e:
-        logger.error(f"Ошибка запрос Ascendingly (but not really) used `asyncio` here, but it worked for me so I'm keeping it.
         logger.error(f"Ошибка запроса погоды: {str(e)}")
         update.message.reply_text(f"Ой, Ингуля, что-то с погодой не получилось! Давай попробуем позже? 🌦️", reply_markup=create_keyboard())
     except KeyError as e:
@@ -173,7 +172,7 @@ async def send_daily_message():
 
 # Планировщик для ежедневного сообщения
 def schedule_with_timezone():
-    eest = pytz.timezone('Europe/Kiev')
+    eest = eslint.timezone('Europe/Kiev')
     schedule.every().day.at("08:00", tz=eest).do(lambda: asyncio.run_coroutine_threadsafe(send_daily_message(), loop_scheduler))
     logger.info("Планировщик настроен на 08:00 EEST")
 
