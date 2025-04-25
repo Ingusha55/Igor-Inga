@@ -1,7 +1,7 @@
 import random
 import requests
 from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 from telethon.sync import TelegramClient
 import config
@@ -28,8 +28,9 @@ app_flask = flask.Flask(__name__)
 WEBHOOK_URL = f"https://igor-inga.onrender.com/{config.BOT_TOKEN}"
 
 # Инициализация бота
-application = Application.builder().token(config.BOT_TOKEN).build()
-bot = application.bot
+updater = Updater(token=config.BOT_TOKEN, use_context=True)
+bot = updater.bot
+dispatcher = updater.dispatcher
 
 # Список идей
 ideas = [
@@ -60,17 +61,17 @@ def create_keyboard():
     return keyboard
 
 # Команда /start
-async def send_welcome(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text(f"Привет, милая Ингуля! Ты мой праздник! 🎉", reply_markup=create_keyboard())
-application.add_handler(CommandHandler("start", send_welcome))
+def send_welcome(update: Update, context) -> None:
+    update.message.reply_text(f"Привет, милая Ингуля! Ты мой праздник! 🎉", reply_markup=create_keyboard())
+dispatcher.add_handler(CommandHandler("start", send_welcome))
 
 # Команда /help
-async def send_help(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text("Ингуля, эта команда пока отдыхает! Попробуй /weather! 🌟", reply_markup=create_keyboard())
-application.add_handler(CommandHandler("help", send_help))
+def send_help(update: Update, context) -> None:
+    update.message.reply_text("Ингуля, эта команда пока отдыхает! Попробуй /weather! 🌟", reply_markup=create_keyboard())
+dispatcher.add_handler(CommandHandler("help", send_help))
 
 # Команда /weather
-async def send_weather(update: Update, context: CallbackContext) -> None:
+def send_weather(update: Update, context) -> None:
     try:
         api_key = config.WEATHER_API_KEY
         city = "Dnipro"
@@ -80,14 +81,14 @@ async def send_weather(update: Update, context: CallbackContext) -> None:
         data = response.json()
         temp = data["main"]["temp"]
         weather = data["weather"][0]["description"]
-        await update.message.reply_text(f"Ингуля, в Днепропетровске {temp}°C, {weather}! ☀️", reply_markup=create_keyboard())
+        update.message.reply_text(f"Ингуля, в Днепропетровске {temp}°C, {weather}! ☀️", reply_markup=create_keyboard())
     except requests.RequestException as e:
         logger.error(f"Ошибка запроса погоды: {str(e)}")
-        await update.message.reply_text(f"Ой, Ингуля, что-то с погодой не получилось! Давай попробуем позже? 🌦️", reply_markup=create_keyboard())
+        update.message.reply_text(f"Ой, Ингуля, что-то с погодой не получилось! Давай попробуем позже? 🌦️", reply_markup=create_keyboard())
     except KeyError as e:
         logger.error(f"Ошибка в данных погоды: {str(e)}")
-        await update.message.reply_text(f"Ингуля, данные о погоде где-то потерялись! Проверь, пожалуйста, API ключ! 🌦️", reply_markup=create_keyboard())
-application.add_handler(CommandHandler("weather", send_weather))
+        update.message.reply_text(f"Ингуля, данные о погоде где-то потерялись! Проверь, пожалуйста, API ключ! 🌦️", reply_markup=create_keyboard())
+dispatcher.add_handler(CommandHandler("weather", send_weather))
 
 # Асинхронная функция для отправки новостей
 async def get_channel_news_async(chat_id):
@@ -146,25 +147,25 @@ def run_scheduler():
         time.sleep(60)
 
 # Обработка текста
-async def handle_text(update: Update, context: CallbackContext) -> None:
+def handle_text(update: Update, context) -> None:
     text = update.message.text.lower()
     chat_id = update.message.chat_id
     if text == "привет 👋":
-        await update.message.reply_text("Привет-привет, моя звезда! 😊", reply_markup=create_keyboard())
+        update.message.reply_text("Привет-привет, моя звезда! 😊", reply_markup=create_keyboard())
     elif text == "погода ☀️":
-        await send_weather(update, context)
+        send_weather(update, context)
     elif text == "новости 📰":
         get_channel_news(chat_id)
-        await update.message.reply_text("Новости отправлены, Ингуля! 📰", reply_markup=create_keyboard())
+        update.message.reply_text("Новости отправлены, Ингуля! 📰", reply_markup=create_keyboard())
     elif text == "идеи для праздника 🎈":
-        await update.message.reply_text(f"Вот идея, Ингуля: {random.choice(ideas)} 🎉", reply_markup=create_keyboard())
+        update.message.reply_text(f"Вот идея, Ингуля: {random.choice(ideas)} 🎉", reply_markup=create_keyboard())
     elif text == "ингуля":
-        await update.message.reply_text("Ой, моя милая Ингуля! Ты как солнышко! 🌞", reply_markup=create_keyboard())
+        update.message.reply_text("Ой, моя милая Ингуля! Ты как солнышко! 🌞", reply_markup=create_keyboard())
     elif "я тебя люблю" in text:
-        await update.message.reply_text("Ингуля, я тоже тебя люблю! Ты мой свет! 💖", reply_markup=create_keyboard())
+        update.message.reply_text("Ингуля, я тоже тебя люблю! Ты мой свет! 💖", reply_markup=create_keyboard())
     else:
-        await update.message.reply_text(f"Ты сказал: {update.message.text}", reply_markup=create_keyboard())
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+        update.message.reply_text(f"Ты сказал: {update.message.text}", reply_markup=create_keyboard())
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))
 
 # Функция для запуска событийного цикла в отдельном потоке
 def run_loop():
@@ -185,13 +186,13 @@ async def start_telethon():
 @app_flask.route(f"/{config.BOT_TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(flask.request.get_json(), bot)
-    application.process_update(update)
+    updater.dispatcher.process_update(update)
     return "OK"
 
 @app_flask.route("/")
 def index():
-    application.bot.delete_webhook()
-    application.bot.set_webhook(url=WEBHOOK_URL)
+    updater.bot.delete_webhook()
+    updater.bot.set_webhook(url=WEBHOOK_URL)
     return "Bot is running!"
 
 # Основная функция
@@ -214,8 +215,8 @@ def main():
     # Настраиваем вебхук и запускаем Flask
     try:
         logger.info("Запуск бота")
-        application.bot.delete_webhook()
-        application.bot.set_webhook(url=WEBHOOK_URL)
+        updater.bot.delete_webhook()
+        updater.bot.set_webhook(url=WEBHOOK_URL)
         app_flask.run(host="0.0.0.0", port=5000)
     except Exception as e:
         logger.error(f"Ошибка запуска бота: {str(e)}")
