@@ -1,18 +1,8 @@
-import sys
-import site
-print("Python version:", sys.version)
-print("sys.path:", sys.path)
-print("site.getsitepackages():", site.getsitepackages())
-import os
-telebot_path = os.path.join('/opt/render/project/src/.venv/lib/python3.11/site-packages', 'telegram')
-print("Does telegram package exist?:", os.path.exists(telebot_path))
-print("Contents of site-packages:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages'))
-
-
-import telebot
 import random
 import requests
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telegram import Bot, Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram import ReplyKeyboardMarkup, KeyboardButton
 from telethon.sync import TelegramClient
 import config
 import asyncio
@@ -21,13 +11,11 @@ import threading
 import schedule
 import time
 import flask
+import os
 
 # Настройка логирования для отладки
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# Инициализация бота
-bot = telebot.TeleBot(config.BOT_TOKEN)
 
 # Инициализация Telethon
 client = TelegramClient('session', config.API_ID, config.API_HASH)
@@ -36,8 +24,12 @@ client = TelegramClient('session', config.API_ID, config.API_HASH)
 loop = asyncio.new_event_loop()
 
 # Flask приложение
-app = flask.Flask(__name__)
+app_flask = flask.Flask(__name__)
 WEBHOOK_URL = f"https://igor-inga.onrender.com/{config.BOT_TOKEN}"
+
+# Инициализация бота
+application = Application.builder().token(config.BOT_TOKEN).build()
+bot = application.bot
 
 # Список идей
 ideas = [
@@ -68,18 +60,17 @@ def create_keyboard():
     return keyboard
 
 # Команда /start
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    bot.reply_to(message, f"Привет, милая Ингуля! Ты мой праздник! 🎉", reply_markup=create_keyboard())
+async def send_welcome(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text(f"Привет, милая Ингуля! Ты мой праздник! 🎉", reply_markup=create_keyboard())
+application.add_handler(CommandHandler("start", send_welcome))
 
 # Команда /help
-@bot.message_handler(commands=['help'])
-def send_help(message):
-    bot.reply_to(message, "Ингуля, эта команда пока отдыхает! Попробуй /weather! 🌟", reply_markup=create_keyboard())
+async def send_help(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text("Ингуля, эта команда пока отдыхает! Попробуй /weather! 🌟", reply_markup=create_keyboard())
+application.add_handler(CommandHandler("help", send_help))
 
 # Команда /weather
-@bot.message_handler(commands=['weather'])
-def send_weather(message):
+async def send_weather(update: Update, context: CallbackContext) -> None:
     try:
         api_key = config.WEATHER_API_KEY
         city = "Dnipro"
@@ -89,13 +80,14 @@ def send_weather(message):
         data = response.json()
         temp = data["main"]["temp"]
         weather = data["weather"][0]["description"]
-        bot.reply_to(message, f"Ингуля, в Днепропетровске {temp}°C, {weather}! ☀️", reply_markup=create_keyboard())
+        await update.message.reply_text(f"Ингуля, в Днепропетровске {temp}°C, {weather}! ☀️", reply_markup=create_keyboard())
     except requests.RequestException as e:
         logger.error(f"Ошибка запроса погоды: {str(e)}")
-        bot.reply_to(message, f"Ой, Ингуля, что-то с погодой не получилось! Давай попробуем позже? 🌦️", reply_markup=create_keyboard())
+        await update.message.reply_text(f"Ой, Ингуля, что-то с погодой не получилось! Давай попробуем позже? 🌦️", reply_markup=create_keyboard())
     except KeyError as e:
         logger.error(f"Ошибка в данных погоды: {str(e)}")
-        bot.reply_to(message, f"Ингуля, данные о погоде где-то потерялись! Проверь, пожалуйста, API ключ! 🌦️", reply_markup=create_keyboard())
+        await update.message.reply_text(f"Ингуля, данные о погоде где-то потерялись! Проверь, пожалуйста, API ключ! 🌦️", reply_markup=create_keyboard())
+application.add_handler(CommandHandler("weather", send_weather))
 
 # Асинхронная функция для отправки новостей
 async def get_channel_news_async(chat_id):
@@ -105,7 +97,7 @@ async def get_channel_news_async(chat_id):
                 try:
                     entity = await client.get_entity(channel)
                     messages = await client.get_messages(entity, limit=5)
-                    bot.send_message(chat_id, f"📢 Новости из {channel}:")
+                    await bot.send_message(chat_id, f"📢 Новости из {channel}:")
                     for msg in messages:
                         if msg.message:
                             formatted_message = (
@@ -114,14 +106,14 @@ async def get_channel_news_async(chat_id):
                                 f"{msg.message}\n"
                                 "━━━━━━━━━━━━━━━━━━━━━━"
                             )
-                            bot.send_message(chat_id, formatted_message)
-                    bot.send_message(chat_id, " ")
+                            await bot.send_message(chat_id, formatted_message)
+                    await bot.send_message(chat_id, " ")
                 except Exception as e:
                     logger.error(f"Ошибка с каналом {channel}: {str(e)}")
-                    bot.send_message(chat_id, f"Ой, Ингуля, новости из {channel} не загрузились. Попробуем позже? 🌟")
+                    await bot.send_message(chat_id, f"Ой, Ингуля, новости из {channel} не загрузились. Попробуем позже? 🌟")
     except Exception as e:
         logger.error(f"Ошибка подключения к Telegram: {str(e)}")
-        bot.send_message(chat_id, f"Ингуля, что-то пошло не так с подключением к Telegram. Давай попробуем ещё раз? 🌈")
+        await bot.send_message(chat_id, f"Ингуля, что-то пошло не так с подключением к Telegram. Давай попробуем ещё раз? 🌈")
 
 # Функция для запуска асинхронной задачи в отдельном потоке
 def run_async_in_thread(coro):
@@ -137,15 +129,15 @@ def get_channel_news(chat_id):
         bot.send_message(chat_id, f"Ой, Ингуля, новости не загрузились. Попробуем ещё раз чуть позже? 🌟")
 
 # Ежедневное сообщение
-def send_daily_message():
+async def send_daily_message():
     try:
-        bot.send_message(config.CHAT_ID, "Ингуля, доброе утро! Ты мой свет, сияй ярче солнца! 🌞💖")
+        await bot.send_message(config.CHAT_ID, "Ингуля, доброе утро! Ты мой свет, сияй ярче солнца! 🌞💖")
         logger.info("Ежедневное сообщение отправлено")
     except Exception as e:
         logger.error(f"Ошибка отправки ежедневного сообщения: {str(e)}")
 
 # Планировщик для ежедневного сообщения
-schedule.every().day.at("08:00").do(send_daily_message)
+schedule.every().day.at("08:00").do(lambda: asyncio.run_coroutine_threadsafe(send_daily_message(), loop))
 
 # Функция для запуска планировщика
 def run_scheduler():
@@ -154,25 +146,25 @@ def run_scheduler():
         time.sleep(60)
 
 # Обработка текста
-@bot.message_handler(content_types=['text'])
-def handle_text(message):
-    text = message.text.lower()
-    chat_id = message.chat.id
+async def handle_text(update: Update, context: CallbackContext) -> None:
+    text = update.message.text.lower()
+    chat_id = update.message.chat_id
     if text == "привет 👋":
-        bot.reply_to(message, "Привет-привет, моя звезда! 😊", reply_markup=create_keyboard())
+        await update.message.reply_text("Привет-привет, моя звезда! 😊", reply_markup=create_keyboard())
     elif text == "погода ☀️":
-        send_weather(message)
+        await send_weather(update, context)
     elif text == "новости 📰":
         get_channel_news(chat_id)
-        bot.reply_to(message, "Новости отправлены, Ингуля! 📰", reply_markup=create_keyboard())
+        await update.message.reply_text("Новости отправлены, Ингуля! 📰", reply_markup=create_keyboard())
     elif text == "идеи для праздника 🎈":
-        bot.reply_to(message, f"Вот идея, Ингуля: {random.choice(ideas)} 🎉", reply_markup=create_keyboard())
+        await update.message.reply_text(f"Вот идея, Ингуля: {random.choice(ideas)} 🎉", reply_markup=create_keyboard())
     elif text == "ингуля":
-        bot.reply_to(message, "Ой, моя милая Ингуля! Ты как солнышко! 🌞", reply_markup=create_keyboard())
+        await update.message.reply_text("Ой, моя милая Ингуля! Ты как солнышко! 🌞", reply_markup=create_keyboard())
     elif "я тебя люблю" in text:
-        bot.reply_to(message, "Ингуля, я тоже тебя люблю! Ты мой свет! 💖", reply_markup=create_keyboard())
+        await update.message.reply_text("Ингуля, я тоже тебя люблю! Ты мой свет! 💖", reply_markup=create_keyboard())
     else:
-        bot.reply_to(message, f"Ты сказал: {message.text}", reply_markup=create_keyboard())
+        await update.message.reply_text(f"Ты сказал: {update.message.text}", reply_markup=create_keyboard())
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
 # Функция для запуска событийного цикла в отдельном потоке
 def run_loop():
@@ -190,16 +182,16 @@ async def start_telethon():
         raise
 
 # Webhook маршруты
-@app.route(f"/{config.BOT_TOKEN}", methods=["POST"])
+@app_flask.route(f"/{config.BOT_TOKEN}", methods=["POST"])
 def webhook():
-    update = telebot.types.Update.de_json(flask.request.get_json())
-    bot.process_new_updates([update])
+    update = Update.de_json(flask.request.get_json(), bot)
+    application.process_update(update)
     return "OK"
 
-@app.route("/")
+@app_flask.route("/")
 def index():
-    bot.remove_webhook()
-    bot.set_webhook(url=WEBHOOK_URL)
+    application.bot.delete_webhook()
+    application.bot.set_webhook(url=WEBHOOK_URL)
     return "Bot is running!"
 
 # Основная функция
@@ -219,12 +211,12 @@ def main():
         logger.error(f"Ошибка инициализации Telethon: {str(e)}")
         return
 
-    # Настраиваем webhook
+    # Настраиваем вебхук и запускаем Flask
     try:
         logger.info("Запуск бота")
-        bot.remove_webhook()
-        bot.set_webhook(url=WEBHOOK_URL)
-        app.run(host="0.0.0.0", port=5000)
+        application.bot.delete_webhook()
+        application.bot.set_webhook(url=WEBHOOK_URL)
+        app_flask.run(host="0.0.0.0", port=5000)
     except Exception as e:
         logger.error(f"Ошибка запуска бота: {str(e)}")
     finally:
