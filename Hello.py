@@ -29,7 +29,7 @@ if not all([API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY, CHAT_ID]):
     raise ValueError("Необходимо задать API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY и CHAT_ID в переменных окружения")
 
 # Инициализация Telethon
-client = TelegramClient('session.session', API_ID, API_HASH)  # Изменили путь на session.session
+client = TelegramClient('session.session', API_ID, API_HASH)
 # Глобальный событийный цикл для telethon
 loop = asyncio.new_event_loop()
 
@@ -44,7 +44,7 @@ dispatcher = updater.dispatcher
 
 # Список идей
 ideas = [
-    "Ш Wарики и конфетти везде! 🎈",
+    "Шарики и конфетти везде! 🎈",
     "Гирлянды мигают, как твоя улыбка! ✨",
     "Танцы под любимую музыку! 🕺",
     "Уютный вечер с чаем и печеньками ☕",
@@ -103,24 +103,6 @@ def send_weather(update: Update, context) -> None:
         logger.error(f"Ошибка в данных погоды: {str(e)}")
         update.message.reply_text(f"Ингуля, данные о погоде где-то потерялись! Проверь, пожалуйста, API ключ! 🌦️", reply_markup=create_keyboard())
 dispatcher.add_handler(CommandHandler("weather", send_weather))
-
-# Команда /auth для создания сессии
-async def auth_telethon(chat_id):
-    try:
-        async with client:
-            await client.start()
-            logger.info("Сессия создана! Файл session.session готов.")
-            await bot.send_message(chat_id=chat_id, text="Сессия создана! Файл session.session готов. Скачай его через Render Shell.")
-    except Exception as e:
-        logger.error(f"Ошибка создания сессии: {str(e)}")
-        await bot.send_message(chat_id=chat_id, text=f"Ошибка создания сессии: {str(e)}")
-
-def auth(update: Update, context) -> None:
-    chat_id = update.message.chat_id
-    logger.info("Получена команда /auth")
-    asyncio.run_coroutine_threadsafe(auth_telethon(chat_id), loop)
-    update.message.reply_text("Запускаю авторизацию для Telethon... Проверь Telegram для кода!")
-dispatcher.add_handler(CommandHandler("auth", auth))
 
 # Асинхронная функция для отправки новостей
 async def get_channel_news_async(chat_id):
@@ -209,7 +191,7 @@ def run_loop():
 async def start_telethon():
     try:
         logger.info("Запуск клиента Telethon")
-        await client.start()
+        await client.connect()  # Просто подключаемся, без интерактивного start()
         logger.info("Клиент Telethon запущен")
     except Exception as e:
         logger.error(f"Ошибка запуска Telethon: {str(e)}")
