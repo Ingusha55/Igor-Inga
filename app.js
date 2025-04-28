@@ -2,7 +2,7 @@ const WebApp = window.Telegram.WebApp;
 WebApp.ready();
 
 function getNews() {
-    fetch('/news')
+    fetch('/api/news')
         .then(response => response.json())
         .then(data => {
             document.getElementById('output').innerText = data.news.join('\n');
@@ -13,7 +13,7 @@ function getNews() {
 }
 
 function getWeather() {
-    fetch('/weather')
+    fetch('/api/weather')
         .then(response => response.json())
         .then(data => {
             document.getElementById('output').innerText = `Погода: ${data.weather}`;
@@ -22,7 +22,7 @@ function getWeather() {
 
 function setAlarm() {
     const time = prompt('Введи время будильника (HH:MM):');
-    fetch('/alarm', {
+    fetch('/api/alarm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ time })
