@@ -1,33 +1,29 @@
 from flask import Flask, jsonify, request
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 import requests
 import asyncio
 import gc
+import os
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
 # Конфигурация
-API_ID = 'YOUR_API_ID'
-API_HASH = 'YOUR_API_HASH'
-BOT_TOKEN = 'YOUR_BOT_TOKEN'
-WEATHER_API_KEY = 'YOUR_WEATHER_API_KEY'
+API_ID = 'YOUR_API_ID'  # Замени на свой
+API_HASH = 'YOUR_API_HASH'  # Замени на свой
+BOT_TOKEN = 'YOUR_BOT_TOKEN'  # Замени на свой
+WEATHER_API_KEY = 'YOUR_WEATHER_API_KEY'  # Замени на свой
 CHAT_ID = '7208003922'
-channels = [ '@konkretnost', '@SergeyNikolaevichBogatyrev', '@moyshasheckel', '@sharanism',
-    '@diana_spletni_live', '@SwissVatnik', '@pashatoday_new', '@kotreal',
-    '@NSDVDnepre', '@DneprNR', '@rasstrelny', '@dimonundmir',
-    '@Pavlova_Maria_live',
-    '@readovkanews',
-    '@KremlinPeresmeshnik',
-    '@ukr_2025_ru', '@gruboprostite',
-     '@doposlednego_ukrainca', '@msk_53',
-      '@pridnestrovec']  # 20 каналов
+channels = ['channel1', 'channel2', ...]  # Замени на 17 каналов
+SESSION = os.getenv('TELETHON_SESSION', '')  # Загружаем сессию из переменной окружения
 
-client = TelegramClient('session', API_ID, API_HASH)
+# Инициализация клиента с StringSession
+client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 last_news_time = None
 news_cache = {}
 
-@app.route('/news')
+@app.route('/api/news')
 async def get_news():
     global last_news_time, news_cache
     now = datetime.now()
@@ -53,7 +49,7 @@ async def get_news():
     gc.collect()
     return jsonify({'news': news})
 
-@app.route('/weather')
+@app.route('/api/weather')
 def get_weather():
     try:
         url = f'http://api.openweathermap.org/data/2.5/weather?q=Moscow&appid={WEATHER_API_KEY}&units=metric'
@@ -63,13 +59,15 @@ def get_weather():
     except:
         return jsonify({'weather': 'Ой, погода не загрузилась!'})
 
-@app.route('/alarm', methods=['POST'])
+@app.route('/api/alarm', methods=['POST'])
 def set_alarm():
     time = request.json.get('time')
-    # Здесь логика будильника (например, сохранить время и отправить уведомление позже)
     return jsonify({'message': f'Будильник установлен на {time}'})
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(client.start(bot_token=BOT_TOKEN))
+    # Сохраняем строку сессии (для первого запуска)
+    session_string = client.session.save()
+    print(f"Сохрани эту строку сессии в TELETHON_SESSION: {session_string}")
     app.run(host='0.0.0.0', port=5000)
