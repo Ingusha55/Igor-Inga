@@ -16,7 +16,15 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
 SESSION = os.getenv('TELETHON_SESSION', '')
 CHAT_ID = '7208003922'
-channels = ['channel1', 'channel2', ...]  # Замени на 17 каналов
+channels = [ '@konkretnost', '@SergeyNikolaevichBogatyrev', '@moyshasheckel', '@sharanism',
+    '@diana_spletni_live', '@SwissVatnik', '@pashatoday_new', '@kotreal',
+    '@NSDVDnepre', '@DneprNR', '@rasstrelny', '@dimonundmir',
+    '@Pavlova_Maria_live',
+    '@readovkanews',
+    '@KremlinPeresmeshnik',
+    '@ukr_2025_ru', '@gruboprostite',
+     '@doposlednego_ukrainca', '@msk_53',
+      '@pridnestrovec']  # Замени на 17 каналов
 
 # Проверка, что все переменные заданы
 if not all([API_ID, API_HASH, BOT_TOKEN, WEATHER_API_KEY]):
